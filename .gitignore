@@ -1,0 +1,30 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+env/
+
+# IDE/project files
+*.idea/
+*.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Secrets / config
+*.env
+*.ini
+config.py
+
+# Selenium driver (local)
+chromedriver.exe
+
+# Logs
+*.log
