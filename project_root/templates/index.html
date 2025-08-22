@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Property Report Generator</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='CSS/styles.css') }}"
+    />
+    <style>
+      .parcel-card {
+        border: 1px solid #ccc;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-radius: 5px;
+        background: #f9f9f9;
+      }
+      .parcel-card h4 {
+        margin-top: 0;
+      }
+      .parcel-card ul {
+        list-style: disc;
+        padding-left: 20px;
+      }
+      .parcel-card li {
+        margin-bottom: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Property Summary Report</h1>
+
+      <form id="reportForm" method="POST">
+        <div class="form-group">
+          <label for="assessorurl">Assessor Site(s):</label>
+          <select id="assessorurl" name="assessorurl" required>
+            <option value="">-- Select County --</option>
+            <option
+              value="https://blue.kingcounty.com/Assessor/eRealProperty/Dashboard.aspx?ParcelNbr="
+            >
+              King County
+            </option>
+            <option value="https://psearch.kitsap.gov/pdetails/Default">
+              Kitsap County
+            </option>
+            <option
+              value="https://atip.piercecountywa.gov/app/v2/parcelSearch/search"
+            >
+              Pierce County
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="parcel_number">Parcel Number(s):</label>
+          <input
+            type="text"
+            id="parcel_numbers"
+            name="parcel_numbers"
+            placeholder="Ex: 4715023710, 1234567890, 9876543210"
+            required
+          />
+        </div>
+
+        <button type="submit" class="button">Generate Report</button>
+      </form>
+
+      <div id="status" class="status"></div>
+
+      <div class="preview-section">
+        <h3>📋 Report Preview</h3>
+        <div id="previewContent">
+          <p>
+            <em>Click "Generate Report" to see what will be extracted...</em>
+          </p>
+        </div>
+
+        <!-- Single Export Button for All Parcels -->
+        <form
+          id="exportForm"
+          method="POST"
+          action="/export_word"
+          style="margin-top: 15px; display: none"
+        >
+          <input
+            type="hidden"
+            id="exportParcelNumbers"
+            name="parcel_numbers"
+            value=""
+          />
+          <input
+            type="hidden"
+            id="exportAssessorUrl"
+            name="assessorurl"
+            value=""
+          />
+          <button type="submit">Export All Parcels to Word</button>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      document
+        .getElementById("reportForm")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+          const form = new FormData(this);
+          const preview = document.getElementById("previewContent");
+          const exportForm = document.getElementById("exportForm");
+          preview.innerHTML = "<em>Loading…</em>";
+          exportForm.style.display = "none"; // hide until parcels are loaded
+
+          try {
+            const res = await fetch("/search", { method: "POST", body: form });
+            const json = await res.json();
+
+            if (!res.ok) {
+              preview.innerHTML = `<p style="color:red">${
+                json.error || "Please fill in all required fields."
+              }</p>`;
+              return;
+            }
+
+            const parcels = json.results || [];
+            let html = "";
+
+            let parcelNumbers = []; // collect parcel numbers for export
+            parcels.forEach((parcelObj) => {
+              if (parcelObj.error) {
+                html += `<div class="parcel-card"><p style="color:red">Parcel: ${
+                  parcelObj.parcel_number || "N/A"
+                } - ${parcelObj.error}</p></div>`;
+              } else {
+                const data = parcelObj.data || {};
+                parcelNumbers.push(parcelObj.parcel_number); // add to export list
+
+                // Determine Parcel Summary URL
+                let parcelURL = "#";
+                const urlLower = form.get("assessorurl").toLowerCase();
+                if (urlLower.includes("kingcounty")) {
+                  parcelURL = `https://blue.kingcounty.com/Assessor/eRealProperty/Detail.aspx?ParcelNbr=${parcelObj.parcel_number}`;
+                } else if (urlLower.includes("kitsap.gov")) {
+                  parcelURL = `https://psearch.kitsap.gov/pdetails/Details?parcel=${parcelObj.parcel_number}&page=general`;
+                } else if (urlLower.includes("piercecountywa")) {
+                  parcelURL = `https://atip.piercecountywa.gov/app/v2/propertyDetail/${parcelObj.parcel_number}/summary`;
+                }
+
+                html += `<div class="parcel-card">
+                        <h4>Parcel Summary: <a href="${parcelURL}" target="_blank">${parcelURL}</a></h4>
+                        <ul>
+                          <li><strong>Parcel:</strong> ${
+                            parcelObj.parcel_number || "N/A"
+                          }</li>
+                          <li><strong>Site Address:</strong> ${
+                            data["Site Address"] || "N/A"
+                          }</li>
+                          <li><strong>Taxpayer Name:</strong> ${
+                            data["Taxpayer Name"] || "N/A"
+                          }</li>
+                          <li><strong>Land Acres:</strong> ${
+                            data["Land Acres"] || "N/A"
+                          }</li>
+                          <li><strong>Land Use Description:</strong> ${
+                            data["Land Use Description"] || "N/A"
+                          }</li>
+                          <li><strong>Legal Description:</strong> ${
+                            data["Legal Description"] || "N/A"
+                          }</li>
+                          <li><strong>Exemptions:</strong> ${
+                            data["Exemptions"] || "N/A"
+                          }</li>
+                          <li><strong>Related Parcels:</strong> ${
+                            data["Related Parcels"] || "N/A"
+                          }</li>
+                          <li><strong>Property in Foreclosure:</strong> ${
+                            data["Property in Foreclosure"] || "N/A"
+                          }</li>
+                        </ul>
+                      </div>`;
+              }
+            });
+
+            preview.innerHTML = html;
+
+            if (parcelNumbers.length > 0) {
+              exportForm.style.display = "block"; // show export button
+              document.getElementById("exportParcelNumbers").value =
+                parcelNumbers.join(",");
+              document.getElementById("exportAssessorUrl").value =
+                form.get("assessorurl");
+            }
+          } catch (err) {
+            preview.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
+          }
+        });
+    </script>
+  </body>
+</html>
