@@ -1,4 +1,4 @@
-# Realty Acquisitions Summary Report Generator
+# Property Summary Report Generator
 
 A Flask web app that scrapes assessor data for King, Kitsap, and Pierce counties and generates Word reports for parcels.
 
